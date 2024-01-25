@@ -55,9 +55,9 @@ if [[ $# -eq 1 ]]; then
 elif [[ $# -gt 1 ]]; then
   set -e
 
-  branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
+  branch=$(git $3 rev-parse --abbrev-ref HEAD 2> /dev/null)
   if [[ $branch = HEAD ]]; then
-    branch=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)
+    branch=$(git $3 describe --exact-match --tags 2> /dev/null || git $3 rev-parse --short HEAD)
   fi
 
   # Only supports GitHub for now
@@ -68,7 +68,7 @@ elif [[ $# -gt 1 ]]; then
       ;;
     branch|remote-branch)
       branch=$(sed 's/^[* ]*//' <<< "$2" | cut -d' ' -f1)
-      remote=$(git config branch."${branch}".remote || echo 'origin')
+      remote=$(git $3 config branch."${branch}".remote || echo 'origin')
       branch=${branch#$remote/}
       path=/tree/$branch
       ;;
@@ -76,13 +76,13 @@ elif [[ $# -gt 1 ]]; then
       remote=$2
       path=/tree/$branch
       ;;
-    file) path=/blob/$branch/$(git rev-parse --show-prefix)$2 ;;
+    file) path=/blob/$branch/$(git $3 rev-parse --show-prefix)$2 ;;
     tag)  path=/releases/tag/$2 ;;
     *)    exit 1 ;;
   esac
 
-  remote=${remote:-$(git config branch."${branch}".remote || echo 'origin')}
-  remote_url=$(git remote get-url "$remote" 2> /dev/null || echo "$remote")
+  remote=${remote:-$(git $3 config branch."${branch}".remote || echo 'origin')}
+  remote_url=$(git $3 remote get-url "$remote" 2> /dev/null || echo "$remote")
 
   if [[ $remote_url =~ ^git@ ]]; then
     url=${remote_url%.git}
@@ -174,16 +174,26 @@ _fzf_git_tags() {
 }
 
 _fzf_git_hashes() {
-  _fzf_git_check || return
-  git log --date=short --format="%C(green)%C(bold)%cd %C(auto)%h%d %s (%an)" --graph --color=always |
+  export DELTA_PAGER="less $LESS"
+  [ $1 ] || _fzf_git_check || return
+  [ $1 ] && repo="-C $1"
+  git $=repo l --date=short --format="%C(green)%C(bold)%cd%C(auto)%d %s %C(yellow)%an %C(cyan)%h" --color=always |
   _fzf_git_fzf --ansi --no-sort --bind 'ctrl-s:toggle-sort' \
     --border-label '🍡 Hashes' \
     --header $'CTRL-O (open in browser) ╱ CTRL-D (diff) ╱ CTRL-S (toggle sort)\n\n' \
-    --bind "ctrl-o:execute-silent:bash $__fzf_git commit {}" \
-    --bind 'ctrl-d:execute:grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git diff > /dev/tty' \
+    --bind "ctrl-o:execute-silent:bash $__fzf_git commit {} '$repo'" \
+    --bind 'ctrl-d:execute:grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git '$repo' show > /dev/tty' \
     --color hl:underline,hl+:underline \
-    --preview 'grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git show --color=always' "$@" |
+    --preview 'grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git '$repo' show --color=always' |
   awk 'match($0, /[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*/) { print substr($0, RSTART, RLENGTH) }'
+}
+
+_fzf_git_zprezto() {
+  _fzf_git_hashes ${ZDOTDIR:-$HOME}/.zprezto
+}
+
+_fzf_git_powerlevel10k() {
+  _fzf_git_hashes ${ZDOTDIR:-$HOME}/.zprezto/modules/prompt/external/powerlevel10k
 }
 
 _fzf_git_remotes() {
@@ -261,7 +271,7 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
     done
   }
 fi
-__fzf_git_init files branches tags remotes hashes stashes lreflogs each_ref
+__fzf_git_init files branches tags remotes hashes zprezto powerlevel10k stashes lreflogs each_ref
 
 # -----------------------------------------------------------------------------
 fi

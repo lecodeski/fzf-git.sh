@@ -186,7 +186,7 @@ _fzf_git_hashes() {
   git $=repo l --date=short --format="%C(green)%C(bold)%cd%C(auto)%d %s %C(yellow)%an %C(cyan)%h" --color=always |
   _fzf_git_fzf --ansi --no-sort --bind 'ctrl-s:toggle-sort' \
     --border-label '🍡 Hashes' \
-    --header $'CTRL-O (open in browser) ╱ CTRL-D (diff) ╱ CTRL-S (toggle sort)\n\n' \
+    --header $'CTRL-O (browser)╱CTRL-D (diff)/CTRL-S (tog. sort)/CTRL-W (tog. wrap)\n' \
     --bind "ctrl-o:execute-silent:bash $__fzf_git commit {} '$repo'" \
     --bind 'ctrl-d:execute:grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git '$repo' show > /dev/tty' \
     --color hl:underline,hl+:underline \

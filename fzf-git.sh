@@ -50,15 +50,18 @@ __fzf_git_cat() {
   fi
 }
 
+__fzf_git_pager() {
+  local pager
+  pager="${FZF_GIT_PAGER:-${GIT_PAGER:-$(git config --get core.pager 2>/dev/null)}}"
+  echo "${pager:-cat}"
+}
+
 if [[ $# -eq 1 ]]; then
   branches() {
     git branch "$@" --sort=-committerdate --sort=-HEAD --format=$'%(HEAD) %(color:yellow)%(refname:short) %(color:green)(%(committerdate:relative))\t%(color:blue)%(subject)%(color:reset)' --color=$(__fzf_git_color) | column -ts$'\t'
   }
   refs() {
-    git for-each-ref --sort=-creatordate --sort=-HEAD --color=$(__fzf_git_color) --format=$'%(refname) %(color:green)(%(creatordate:relative))\t%(color:blue)%(subject)%(color:reset)' |
-      eval "$1" |
-      sed 's#^refs/remotes/#\x1b[95mremote-branch\t\x1b[33m#; s#^refs/heads/#\x1b[92mbranch\t\x1b[33m#; s#^refs/tags/#\x1b[96mtag\t\x1b[33m#; s#refs/stash#\x1b[91mstash\t\x1b[33mrefs/stash#' |
-      column -ts$'\t'
+    git for-each-ref "$@" --sort=-creatordate --sort=-HEAD --color=$(__fzf_git_color) --format=$'%(if:equals=refs/remotes)%(refname:rstrip=-2)%(then)%(color:magenta)remote-branch%(else)%(if:equals=refs/heads)%(refname:rstrip=-2)%(then)%(color:brightgreen)branch%(else)%(if:equals=refs/tags)%(refname:rstrip=-2)%(then)%(color:brightcyan)tag%(else)%(if:equals=refs/stash)%(refname:rstrip=-2)%(then)%(color:brightred)stash%(else)%(color:white)%(refname:rstrip=-2)%(end)%(end)%(end)%(end)\t%(color:yellow)%(refname:short) %(color:green)(%(creatordate:relative))\t%(color:blue)%(subject)%(color:reset)' | column -ts$'\t'
   }
   case "$1" in
     branches)
@@ -71,11 +74,11 @@ if [[ $# -eq 1 ]]; then
       ;;
     refs)
       echo $'CTRL-O (open in browser) ╱ ALT-E (examine in editor) ╱ ALT-A (show all refs)\n'
-      refs 'grep -v ^refs/remotes'
+      refs --exclude='refs/remotes'
       ;;
     all-refs)
       echo $'CTRL-O (open in browser) ╱ ALT-E (examine in editor)\n'
-      refs 'cat'
+      refs
       ;;
     nobeep) ;;
     *) exit 1 ;;
@@ -132,8 +135,8 @@ if [[ $- =~ i ]]; then
 
 # Redefine this function to change the options
 _fzf_git_fzf() {
-  fzf-tmux -p80%,60% -- \
-    --layout=reverse --multi --height=50% --min-height=20 --border \
+  fzf --height=50% --tmux 90%,70% \
+    --layout=reverse --multi --min-height=20 --border \
     --border-label-pos=2 \
     --color='header:italic:underline,label:blue' \
     --preview-window='right,50%,border-left' \
@@ -164,7 +167,7 @@ _fzf_git_files() {
     --bind "ctrl-o:execute-silent:bash $__fzf_git file {-1}" \
     --bind "alt-e:execute:${EDITOR:-vim} {-1} > /dev/tty" \
     --query "$query" \
-    --preview "git diff --no-ext-diff --color=$(__fzf_git_color .) -- {-1} | sed 1,4d; $(__fzf_git_cat) {-1}" "$@" |
+    --preview "git diff --no-ext-diff --color=$(__fzf_git_color .) -- {-1} | $(__fzf_git_pager); $(__fzf_git_cat) {-1}" "$@" |
   cut -c4- | sed 's/.* -> //'
 }
 
@@ -192,7 +195,7 @@ _fzf_git_tags() {
     --border-label '📛 Tags' \
     --header $'CTRL-O (open in browser)\n\n' \
     --bind "ctrl-o:execute-silent:bash $__fzf_git tag {}" \
-    --preview "git show --color=$(__fzf_git_color .) {}" "$@"
+    --preview "git show --color=$(__fzf_git_color .) {} | $(__fzf_git_pager)" "$@"
 }
 
 _fzf_git_hashes() {
@@ -206,7 +209,7 @@ _fzf_git_hashes() {
     --bind "ctrl-o:execute-silent:bash $__fzf_git commit {} '$repo'" \
     --bind 'ctrl-d:execute:grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git '$repo' show --color=$(__fzf_git_color) > /dev/tty' \
     --color hl:underline,hl+:underline \
-    --preview "grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git "$repo" show --color=$(__fzf_git_color .)" |
+    --preview "grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git "$repo" show --color=$(__fzf_git_color .) | $(__fzf_git_pager)" |
   awk 'match($0, /[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*/) { print substr($0, RSTART, RLENGTH) }'
 }
 
@@ -236,7 +239,7 @@ _fzf_git_stashes() {
     --border-label '🥡 Stashes' \
     --header $'CTRL-X (drop stash)\n\n' \
     --bind 'ctrl-x:reload(git stash drop -q {1}; git stash list)' \
-    -d: --preview "git show --color=$(__fzf_git_color .) {1}" "$@" |
+    -d: --preview "git show --color=$(__fzf_git_color .) {1} | $(__fzf_git_pager)" "$@" |
   cut -d: -f1
 }
 
@@ -244,7 +247,7 @@ _fzf_git_lreflogs() {
   _fzf_git_check || return
   git reflog --color=$(__fzf_git_color) --format="%C(blue)%gD %C(yellow)%h%C(auto)%d %gs" | _fzf_git_fzf --ansi \
     --border-label '📒 Reflogs' \
-    --preview "git show --color=$(__fzf_git_color .) {1}" "$@" |
+    --preview "git show --color=$(__fzf_git_color .) {1} | $(__fzf_git_pager)" "$@" |
   awk '{print $1}'
 }
 

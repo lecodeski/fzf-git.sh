@@ -206,7 +206,7 @@ _fzf_git_hashes() {
     --bind "ctrl-o:execute-silent:bash $__fzf_git commit {} '$repo'" \
     --bind 'ctrl-d:execute:grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git '$repo' show --color=$(__fzf_git_color) > /dev/tty' \
     --color hl:underline,hl+:underline \
-    --preview 'grep -o "[a-f0-9]\{7,\}" <<< {} | head -n 1 | xargs git '$repo' show --color=$(__fzf_git_color .)' |
+    --preview "grep -o '[a-f0-9]\{7,\}' <<< {} | head -n 1 | xargs git "$repo" show --color=$(__fzf_git_color .)" |
   awk 'match($0, /[a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9][a-f0-9]*/) { print substr($0, RSTART, RLENGTH) }'
 }
 

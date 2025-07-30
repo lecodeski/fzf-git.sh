@@ -326,6 +326,8 @@ CTRL-G CTRL-B for Branches
 CTRL-G CTRL-T for Tags
 CTRL-G CTRL-R for Remotes
 CTRL-G CTRL-H for commit Hashes
+CTRL-G CTRL-P for commit Hashes of the Powerlevel10k repo
+CTRL-G CTRL-Z for commit Hashes of the Prezto repo
 CTRL-G CTRL-S for Stashes
 CTRL-G CTRL-L for reflogs
 CTRL-G CTRL-W for Worktrees
